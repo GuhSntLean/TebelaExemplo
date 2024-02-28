@@ -11,7 +11,7 @@ import {
   TableSortLabel,
 } from "@mui/material";
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 // Data
 interface Character {
@@ -36,6 +36,7 @@ interface Character {
 interface HeadCell {
   id: keyof Character;
   label: string;
+  numeric: boolean;
 }
 
 // Tipo de ordenação
@@ -45,22 +46,27 @@ const headCells: HeadCell[] = [
   {
     id: "name",
     label: "Nome",
+    numeric: false,
   },
   {
     id: "height",
     label: "Altura",
+    numeric: true,
   },
   {
     id: "hair_color",
     label: "Cor do cabelo	",
+    numeric: false,
   },
   {
     id: "eye_color",
     label: "Cor dos olhos",
+    numeric: false,
   },
   {
     id: "birth_year",
     label: "Data de aniversario",
+    numeric: false,
   },
 ];
 
@@ -68,7 +74,7 @@ function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   let result: number;
   if (b[orderBy] < a[orderBy]) {
     result = -1;
-  } else if (b[orderBy] < a[orderBy]) {
+  } else if (b[orderBy] > a[orderBy]) {
     result = 1;
   } else {
     result = 0;
@@ -88,9 +94,21 @@ function getComparator<Key extends keyof any>(
   if (order === "desc") {
     result = (a: any, b: any) => descendingComparator(a, b, orderBy);
   } else {
-    result = (a: any, b: any) => descendingComparator(a, b, orderBy);
+    result = (a: any, b: any) => -descendingComparator(a, b, orderBy);
   }
   return result;
+}
+
+function stableSort<T>(array: Character[], comparator: (a: T, b: T) => number) {
+  const stabilizedThis = array.map((el, index) => [el, index] as [T, number]);
+  stabilizedThis.sort((a, b) => {
+    const order = comparator(a[0], b[0]);
+    if (order !== 0) {
+      return order;
+    }
+    return a[1] - b[1];
+  });
+  return stabilizedThis.map((el) => el[0]);
 }
 
 function App() {
@@ -131,11 +149,20 @@ function App() {
       handleRequestSort(property);
     };
 
-  const handleRequestSort = (property: any) => {
+  const handleRequestSort = (property: keyof Character) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
     setOrderBy(property);
   };
+
+  const visibleRows = useMemo(
+    () =>
+      stableSort(characters, getComparator(order, orderBy)).slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+      ),
+    [characters, order, orderBy, page, rowsPerPage]
+  );
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -163,17 +190,18 @@ function App() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {characters
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((character) => (
+
+              {visibleRows.map((row, index) => {
+                return (
                   <TableRow>
-                    <TableCell>{character.name}</TableCell>
-                    <TableCell>{character.height}</TableCell>
-                    <TableCell>{character.hair_color}</TableCell>
-                    <TableCell>{character.eye_color}</TableCell>
-                    <TableCell>{character.birth_year}</TableCell>
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell>{row.height}</TableCell>
+                    <TableCell>{row.hair_color}</TableCell>
+                    <TableCell>{row.eye_color}</TableCell>
+                    <TableCell>{row.birth_year}</TableCell>
                   </TableRow>
-                ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
